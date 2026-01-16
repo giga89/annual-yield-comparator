@@ -2,7 +2,6 @@ const startYear = 2000;
 const currentYear = new Date().getFullYear();
 const endYear = currentYear; // Up to current year
 
-// Historical Data (Hardcoded based on research)
 // Historical Data loaded from indices_data.js
 
 const userReturns = {};
@@ -14,9 +13,38 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initInputs() {
-    const grid = document.getElementById('inputGrid');
+    // Default: Empty grid as requested "al default non mostrarne nessuna"
 
-    for (let year = startYear; year <= endYear; year++) {
+    document.getElementById('downloadBtn').addEventListener('click', downloadChart);
+    document.getElementById('clearBtn').addEventListener('click', clearData);
+
+    // Listen to Start Year input change to regenerate grid if user wants manual entry
+    const startYearInput = document.getElementById('startYear');
+    if (startYearInput) {
+        // Initial value check
+        // If the user manually changes the start year, we regenerate the grid
+        startYearInput.addEventListener('change', () => {
+            const y = parseInt(startYearInput.value);
+            if (y && y >= 2000 && y <= endYear) {
+                generateInputGrid(y);
+                updateChart();
+            }
+        });
+
+        // Populate default if needed, or leave as HTML default (2020)
+        // But we DON'T generate grid yet.
+    }
+}
+
+function generateInputGrid(fromYear) {
+    const grid = document.getElementById('inputGrid');
+    if (!grid) return;
+    grid.innerHTML = ''; // Clear existing
+
+    // Ensure we don't go into future or crazy past
+    const safeStart = Math.max(2000, fromYear);
+
+    for (let year = safeStart; year <= endYear; year++) {
         const group = document.createElement('div');
         group.className = 'year-input-group';
 
@@ -30,15 +58,15 @@ function initInputs() {
         input.dataset.year = year;
         input.addEventListener('input', handleInputChange);
 
+        // Pre-fill if we have data for this year
+        if (userReturns[year] !== undefined) {
+            input.value = userReturns[year];
+        }
+
         group.appendChild(label);
         group.appendChild(input);
         grid.appendChild(group);
     }
-
-    document.getElementById('downloadBtn').addEventListener('click', downloadChart);
-    document.getElementById('clearBtn').addEventListener('click', clearData);
-
-    // We do NOT loadUserReturns() here to keep fields empty by default as requested.
 }
 
 // Fetch Data Logic
@@ -56,7 +84,11 @@ function toggleOverlay(show) {
 if (fetchBtn) {
     fetchBtn.addEventListener('click', async () => {
         const username = etoroUsernameInput.value.trim();
-        const startYear = parseInt(startYearInput.value) || 2020;
+        // Use the input value as a filter preference, 
+        // BUT we might adjust the grid if data is found earlier?
+        // The user said: "Se l'utente ha i dati dal 2011 ci devono essere tutte dal 2011"
+        // So the fetch logic should probably find the min year first.
+        let requestedStartYear = parseInt(startYearInput.value) || 2020;
 
         if (!username) {
             updateStatus('Please enter a username', 'error');
@@ -65,7 +97,7 @@ if (fetchBtn) {
 
         toggleOverlay(true);
         updateStatus('Fetching data...', 'loading');
-        await fetchBullAwareData(username, startYear);
+        await fetchBullAwareData(username, requestedStartYear);
         toggleOverlay(false);
     });
 }
@@ -76,11 +108,11 @@ function updateStatus(msg, type) {
     fetchStatus.className = `status-msg ${type}`;
 }
 
-async function fetchBullAwareData(username, startYear) {
+async function fetchBullAwareData(username, requestedStartYear) {
     // BullAware might be slow or rate-limit the proxy.
     // Enhanced with Retry Logic
 
-    const MAX_RETRIES = 2; // Try up to 3 times total
+    const MAX_RETRIES = 2;
     let attempt = 0;
 
     while (attempt <= MAX_RETRIES) {
@@ -88,7 +120,6 @@ async function fetchBullAwareData(username, startYear) {
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://bullaware.com/etoro/${username}`)}&timestamp=${new Date().getTime()}`;
 
         try {
-            // Set a client-side timeout of 10s to fail fast and retry if needed
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -96,12 +127,10 @@ async function fetchBullAwareData(username, startYear) {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                // Handle specifics
                 if (response.status === 408 || response.status === 504) {
-                    throw new Error('Timeout'); // Trigger retry
+                    throw new Error('Timeout');
                 }
                 if (response.status === 500) {
-                    // Often implies 404 from the target via this specific proxy
                     throw new Error('User not found. Check capitalization (e.g. "BorisAka").');
                 }
                 throw new Error(`Network error (${response.status})`);
@@ -109,31 +138,26 @@ async function fetchBullAwareData(username, startYear) {
 
             const text = await response.text();
 
-            // Check if we actually got the target page or a proxy error page
             if (text.length < 500 && text.toLowerCase().includes('error')) {
                 throw new Error("Proxy error possibly.");
             }
 
-            // Regex for Data
             const regex = /\\?"monthlyReturns\\?":\s*(\{[^}]+})/;
             const match = text.match(regex);
 
             if (match && match[1]) {
                 let jsonString = match[1];
                 // Aggressive cleaning: Remove ALL backslashes.
-                // This handles single escaped (\") and double escaped (\\\") quotes securely
-                // because our specific dataset (dates and numbers) doesn't use backslashes.
                 jsonString = jsonString.replace(/\\/g, '');
 
                 try {
                     const monthlyData = JSON.parse(jsonString);
-                    processFetchedData(monthlyData, startYear);
+                    processFetchedData(monthlyData, requestedStartYear);
                     updateStatus('Data loaded successfully!', 'success');
-                    return; // SUCCESS - Exit function
+                    return;
                 } catch (e) {
                     console.error("JSON Parse error:", e);
-                    // Show part of the string to debug
-                    throw new Error("Parsing failed invalid char at " + e.message + " | String: " + jsonString.substring(0, 30) + "...");
+                    throw new Error("Parsing failed: " + e.message);
                 }
             } else {
                 throw new Error('Could not find data in response.');
@@ -142,7 +166,6 @@ async function fetchBullAwareData(username, startYear) {
         } catch (error) {
             console.warn(`Attempt ${attempt} failed: ${error.message}`);
 
-            // Should we retry?
             const isTimeout = error.message.includes('Timeout') || error.name === 'AbortError';
             if (isTimeout && attempt <= MAX_RETRIES) {
                 updateStatus(`Timeout, retrying... (${attempt}/${MAX_RETRIES})`, 'loading');
@@ -150,22 +173,22 @@ async function fetchBullAwareData(username, startYear) {
                 continue;
             }
 
-            // Final Error Handling
             if (attempt > MAX_RETRIES || !isTimeout) {
                 let msg = error.message;
                 if (msg.includes('Timeout') || msg.includes('AbortError')) {
                     msg = "Server timed out (408). Please try again later.";
                 }
                 updateStatus(msg, 'error');
-                return; // Stop trying
+                return;
             }
         }
     }
 }
 
-function processFetchedData(monthlyData, startYear) {
-    // Organize by year
+function processFetchedData(monthlyData, requestedStartYear) {
+    // 1. Organize by year
     const yearsData = {};
+    let minYearFound = 3000;
 
     Object.entries(monthlyData).forEach(([key, val]) => {
         if (!val && val !== 0) return;
@@ -173,8 +196,7 @@ function processFetchedData(monthlyData, startYear) {
         if (parts.length !== 2) return;
 
         const year = parseInt(parts[0]);
-        // Filter by start year
-        if (year < startYear) return;
+        if (year < minYearFound) minYearFound = year;
 
         const returnVal = parseFloat(val);
 
@@ -182,9 +204,33 @@ function processFetchedData(monthlyData, startYear) {
         yearsData[year].push(returnVal);
     });
 
-    // Calculate Annual Yields
+    // 2. Logic to determine Grid Start Year
+    // "ok ma se scrivo 2020 nello start year deve rimanere 2020 non prendere TUTTI gli anni"
+    // Rule 1: Respect User Filter. If User inputs 2020, do NOT show 2019 even if data exists.
+    // Rule 2: If Data starts LATER than User Input (e.g. Input 2020, Data starts 2023), 
+    //         we should start from 2023 (hide empty 2020-2022 boxes), because user said:
+    //         "se ha i dati solo dal 2023 deve esserci solo 2023..."
+
+    let effectiveStartYear = Math.max(requestedStartYear, minYearFound);
+    if (effectiveStartYear < 2000) effectiveStartYear = 2000;
+
+    // We do NOT overwrite the input value unless we are forced to move FORWARD 
+    // (e.g. user asked 2020 but data starts 2023).
+    if (startYearInput && effectiveStartYear > requestedStartYear) {
+        startYearInput.value = effectiveStartYear;
+    }
+    // If user asked 2020 and data starts 2015, effective is 2020. 
+    // We leave input as 2020. Correct.
+
+    // 3. Generate Grid dynamically from this effective start year
+    generateInputGrid(effectiveStartYear);
+
+    // 4. Calculate Annual Yields
     const annualYields = {};
     Object.keys(yearsData).forEach(year => {
+        // Filter: We only care about data >= effectiveStartYear
+        if (year < effectiveStartYear) return;
+
         const months = yearsData[year];
         let compounded = 1.0;
         months.forEach(r => {
@@ -192,23 +238,15 @@ function processFetchedData(monthlyData, startYear) {
         });
 
         const yieldVal = (compounded - 1.0) * 100;
-        // High precision (4 decimals)
         annualYields[year] = parseFloat(yieldVal.toFixed(4));
     });
 
-    // 1. Reset userReturns
+    // 5. Reset userReturns
     Object.keys(userReturns).forEach(key => delete userReturns[key]);
-
-    // 2. Assign new filtered data
     Object.assign(userReturns, annualYields);
     saveUserReturns();
 
-    // 3. Clear ALL inputs first (visual reset)
-    document.querySelectorAll('.year-input-group input').forEach(input => {
-        input.value = '';
-    });
-
-    // 4. Populate inputs with new data
+    // 6. Populate inputs
     Object.entries(userReturns).forEach(([year, val]) => {
         const input = document.querySelector(`input[data-year="${year}"]`);
         if (input) input.value = val;
@@ -226,20 +264,22 @@ function loadUserReturns() {
     const saved = localStorage.getItem('annual_yield_user_returns');
     if (saved) {
         Object.assign(userReturns, JSON.parse(saved));
+        // If we have saved data, what grid to show?
+        // Maybe find min year in saved data?
+        const years = Object.keys(userReturns).map(Number);
+        if (years.length > 0) {
+            const min = Math.min(...years);
+            if (startYearInput) startYearInput.value = min;
+            generateInputGrid(min);
+            // Populate inputs
+            Object.entries(userReturns).forEach(([year, val]) => {
+                const input = document.querySelector(`input[data-year="${year}"]`);
+                if (input) input.value = val;
+            });
+            updateComparison();
+            updateChart();
+        }
     }
-
-    if (typeof fetchedUserReturns !== 'undefined') {
-        Object.assign(userReturns, fetchedUserReturns);
-        saveUserReturns();
-    }
-
-    Object.entries(userReturns).forEach(([year, val]) => {
-        const input = document.querySelector(`input[data-year="${year}"]`);
-        if (input) input.value = val;
-    });
-
-    updateComparison();
-    updateChart();
 }
 
 function saveUserReturns() {
@@ -251,9 +291,10 @@ function clearData() {
         for (const key in userReturns) delete userReturns[key];
         localStorage.removeItem('annual_yield_user_returns');
 
-        document.querySelectorAll('.year-input-group input').forEach(input => {
-            input.value = '';
-        });
+        // Clear grid visuals or empty it?
+        // "Al default non mostrarne nessuno" implies when no data, no grid.
+        const grid = document.getElementById('inputGrid');
+        if (grid) grid.innerHTML = '';
 
         updateComparison();
         updateChart();
@@ -277,6 +318,7 @@ function handleInputChange(e) {
 
 function updateComparison() {
     const container = document.getElementById('comparisonResults');
+    if (!container) return;
     container.innerHTML = '';
 
     const yearsEntered = Object.keys(userReturns).map(Number).sort((a, b) => b - a);
@@ -336,7 +378,9 @@ function createResultCard(container, name, diff, userTotal, indexTotal) {
 }
 
 function initChart() {
-    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const canvas = document.getElementById('performanceChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.font.family = "'Outfit', sans-serif";
@@ -384,12 +428,18 @@ function initChart() {
 }
 
 function updateChart() {
-    // 1. Determine Chart Range
-    const inputStartYear = parseInt(document.getElementById('startYear').value) || startYear;
+    // Determine Chart Range
+    // Dynamic based on the grid / input start year
+
+    const startYearInput = document.getElementById('startYear');
+    let inputStartYear = parseInt(startYearInput.value) || 2020;
+
+    // Safety check
+    if (inputStartYear < 2000) inputStartYear = 2000;
+
     const years = [];
     for (let y = inputStartYear; y <= endYear; y++) years.push(y);
 
-    // 2. Prepare Datasets
     const datasets = [];
 
     // User Dataset (Accumulated)
@@ -447,7 +497,6 @@ function updateChart() {
         });
     });
 
-    // 3. Render Chart
     const canvas = document.getElementById('performanceChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
