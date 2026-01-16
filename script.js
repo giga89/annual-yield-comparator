@@ -372,6 +372,7 @@ function createResultCard(container, name, diff, userTotal, indexTotal) {
         <div class="result-badge ${badgeClass}">
             ${diffFormatted} (${statusText})
         </div>
+        <span class="result-footer">Tool by @AndreaRavalli</span>
     `;
 
     container.appendChild(card);
@@ -511,6 +512,23 @@ function updateChart() {
             labels: years,
             datasets: datasets
         },
+        plugins: [{
+            id: 'watermark',
+            afterDraw: (chart) => {
+                const ctx = chart.ctx;
+                const width = chart.width;
+                const height = chart.height;
+
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.font = '12px "Outfit", sans-serif';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillText('Tool by @AndreaRavalli', width - 10, height - 10);
+                ctx.restore();
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,

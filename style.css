@@ -509,3 +509,12 @@ footer i {
         transform: translateX(0);
     }
 }
+.result-footer {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-align: right;
+    font-style: italic;
+    opacity: 0.6;
+}
