@@ -518,3 +518,17 @@ footer i {
     font-style: italic;
     opacity: 0.6;
 }
+
+.vertical-watermark {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 0.9rem;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 1000;
+    letter-spacing: 1px;
+}

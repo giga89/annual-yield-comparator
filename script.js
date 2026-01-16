@@ -372,7 +372,6 @@ function createResultCard(container, name, diff, userTotal, indexTotal) {
         <div class="result-badge ${badgeClass}">
             ${diffFormatted} (${statusText})
         </div>
-        <span class="result-footer">Tool by @AndreaRavalli</span>
     `;
 
     container.appendChild(card);
