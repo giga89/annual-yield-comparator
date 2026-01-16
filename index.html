@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annual Yield Comparator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-chart-line"></i> Annual Yield Comparator</h1>
+            <p>Compare your annual performance against major global indices.</p>
+        </header>
+
+        <main>
+            <section class="input-section glass-card">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-pen-to-square"></i> Your Performance</h2>
+                    <button id="clearBtn" class="btn-icon" title="Clear Data">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+
+                <div class="fetch-card">
+                    <div class="input-row">
+                        <div class="input-wrapper" style="flex: 2;">
+                            <label class="input-label">Username</label>
+                            <input type="text" id="etoroUsername" class="styled-input" placeholder="e.g. AndreaRavalli"
+                                value="AndreaRavalli">
+                        </div>
+                        <div class="input-wrapper" style="flex: 1;">
+                            <label class="input-label">Start Year</label>
+                            <input type="number" id="startYear" class="styled-input" placeholder="2020" value="2020">
+                        </div>
+                        <button id="fetchBtn" class="action-btn" style="margin-top: 24px;">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Fetch
+                        </button>
+                    </div>
+                    <div id="fetchStatus" class="status-msg"></div>
+                </div>
+
+                <div class="input-grid" id="inputGrid">
+                    <!-- Inputs will be generated here by JS -->
+                </div>
+            </section>
+
+            <section class="results-section">
+                <div class="comparison-container glass-card">
+                    <h2><i class="fa-solid fa-scale-balanced"></i> Benchmark Comparison</h2>
+                    <div id="comparisonResults" class="comparison-results">
+                        <div class="empty-state">
+                            <i class="fa-regular fa-keyboard"></i>
+                            <p>Enter your returns above to see the comparison.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container glass-card">
+                    <div class="chart-header">
+                        <h2><i class="fa-solid fa-chart-area"></i> Performance History</h2>
+                        <button id="downloadBtn" class="btn-download" title="Download Chart">
+                            <i class="fa-solid fa-download"></i> Save Image
+                        </button>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Built with <i class="fa-solid fa-code"></i> & <i class="fa-solid fa-heart"></i></p>
+        </footer>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <div class="loading-text">Fetching data...</div>
+    </div>
+
+    <script src="user_data.js"></script>
+    <script src="indices_data.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
